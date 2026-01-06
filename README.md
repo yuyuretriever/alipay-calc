@@ -1,2 +1,2 @@
 # alipay-calc
-Alipay calculator including oversea extra fee.
+Alipay calculator included payment handling fee and foreign transaction fee.
