@@ -54,12 +54,11 @@
         const { useState, useEffect } = React;
 
         function App() {
-            // 修改點 1: 預設值改為字串 '2400'，這樣才能支援「空字串」
-            const [cny, setCny] = useState('2400');
+            const [cny, setCny] = useState('');
             const [rate, setRate] = useState(4.5);
             const [loading, setLoading] = useState(true);
 
-            // 匯率 API
+            // Currency API
             useEffect(() => {
                 fetch('https://api.exchangerate-api.com/v4/latest/CNY')
                     .then(res => res.json())
@@ -75,18 +74,14 @@
                     });
             }, []);
 
-            // 修改點 2: 更聰明的輸入處理函式
             const handleInputChange = (e) => {
                 const val = e.target.value;
 
-                // 狀況 A: 如果使用者清空內容，就設為空字串 (不要強制變回 0)
                 if (val === '') {
                     setCny('');
                     return;
                 }
 
-                // 狀況 B: 處理開頭的 0 (例如輸入 '09' -> 自動變 '9')
-                // 但要保留 '0.' 這種小數點開頭
                 if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
                     setCny(String(Number(val)));
                 } else {
@@ -94,7 +89,6 @@
                 }
             };
 
-            // 計算時將字串轉回數字，如果是空字串就當作 0
             const numCny = Number(cny);
             const alipayFee = numCny > 200 ? numCny * 0.03 : 0;
             const billedCNY = numCny + alipayFee;
