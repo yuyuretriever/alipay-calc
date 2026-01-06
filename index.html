@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>支付寶金額試算</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Noto Sans TC"', 'sans-serif'],
+              mono: ['"Roboto Mono"', 'monospace'],
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+      /* 隱藏數字輸入框箭頭 */
+      input[type=number]::-webkit-inner-spin-button, 
+      input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
+      }
+      input[type=number] {
+        -moz-appearance: textfield;
+      }
+    </style>
+</head>
+<body class="bg-zinc-100 flex items-center justify-center min-h-screen p-4">
+    
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            // 修改點 1: 預設值改為字串 '2400'，這樣才能支援「空字串」
+            const [cny, setCny] = useState('2400');
+            const [rate, setRate] = useState(4.5);
+            const [loading, setLoading] = useState(true);
+
+            // 匯率 API
+            useEffect(() => {
+                fetch('https://api.exchangerate-api.com/v4/latest/CNY')
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.rates.TWD) {
+                            setRate(data.rates.TWD);
+                        }
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error("API Error", err);
+                        setLoading(false);
+                    });
+            }, []);
+
+            // 修改點 2: 更聰明的輸入處理函式
+            const handleInputChange = (e) => {
+                const val = e.target.value;
+
+                // 狀況 A: 如果使用者清空內容，就設為空字串 (不要強制變回 0)
+                if (val === '') {
+                    setCny('');
+                    return;
+                }
+
+                // 狀況 B: 處理開頭的 0 (例如輸入 '09' -> 自動變 '9')
+                // 但要保留 '0.' 這種小數點開頭
+                if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+                    setCny(String(Number(val)));
+                } else {
+                    setCny(val);
+                }
+            };
+
+            // 計算時將字串轉回數字，如果是空字串就當作 0
+            const numCny = Number(cny);
+            const alipayFee = numCny > 200 ? numCny * 0.03 : 0;
+            const billedCNY = numCny + alipayFee;
+            const baseTWD = billedCNY * rate;
+            const cardFee = baseTWD * 0.015;
+            const totalTWD = Math.ceil(baseTWD + cardFee);
+
+            return (
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-fade-in border border-gray-100">
+                    <div className="mb-8">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-1">支付寶試算</h1>
+                        <p className="text-gray-500 text-sm">估算支付 (CNY → TWD) 總金額</p>
+                    </div>
+
+                    <div className="mb-8">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            付款金額 (人民幣 CNY)
+                        </label>
+                        <div className="relative group">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl font-light">¥</span>
+                            <input
+                                type="number"
+                                value={cny}
+                                onChange={handleInputChange}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-4 pl-10 pr-4 text-3xl font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-center placeholder-gray-300"
+                                placeholder="0" 
+                                inputMode="decimal"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 my-6"></div>
+
+                    <div className="mb-8">
+                        <p className="text-gray-500 text-sm mb-2">預估總金額 (台幣 TWD)</p>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-gray-500 font-medium text-xl">NT$</span>
+                            <span className="text-5xl font-bold text-gray-900 tracking-tight">
+                                {totalTWD.toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <h3 className="font-medium text-gray-900 mb-3">費用明細</h3>
+                        
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-500">當前匯率</span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-gray-700">{rate.toFixed(4)}</span>
+                                {loading ? 
+                                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">載入中</span> :
+                                    <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">即時</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-500">
+                                支付寶服務費 
+                                {numCny > 200 && <span className="ml-1 text-xs text-orange-500">(3%)</span>}
+                            </span>
+                            <span className="font-mono text-gray-700">¥ {alipayFee.toFixed(2)}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-500">海外交易手續費 (1.5%)</span>
+                            <span className="font-mono text-gray-700">NT$ {cardFee.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
